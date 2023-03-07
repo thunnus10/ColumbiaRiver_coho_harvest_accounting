@@ -1,0 +1,101 @@
+# This function reads data from inriver harvest template ####
+# Function written by Tim Sippel - WDFW 
+
+read_inriver_data<-function(inriver_directory, inriver_filename, fishery_year, 
+                            start_day_sport_week, start_day_commericial_week){
+  if (!"tidyverse" %in% installed.packages()) install.packages("tidyverse")
+  if (!"readxl" %in% installed.packages()) install.packages("readxl")
+  library("tidyverse")
+  library("readxl")
+  source("Functions/generate_fishery_calendars.R")
+  
+  # Generate sport and commercial fishing calendars from internal function "generate_fishery_calendars.R" ####
+  fishing_calendars<-generate_fishery_calendars(fishery_year)
+  
+  # Read sport handle ####
+  sport_handle<-read_excel(path = paste(inriver_directory, inriver_filename, sep=""), 
+                            sheet = "Input_SportFishery_Handle",
+                            skip = 2) %>% 
+    mutate(Start_date=as_date(Start_date), 
+           Kept_clipped_adults = ifelse(is.na(Kept_clipped_adults), 0, Kept_clipped_adults),
+           Kept_unclipped_adults = ifelse(is.na(Kept_unclipped_adults), 0, Kept_unclipped_adults),
+           Released_adults = ifelse(is.na(Released_adults), 0, Released_adults),
+           Kept_jacks = ifelse(is.na(Kept_jacks), 0, Kept_jacks),
+           Comment = as.character(Comment))
+  
+  # Read commercial handle ####
+  commercial_handle<-read_excel(path = paste(inriver_directory, inriver_filename, sep=""), 
+                            sheet = "Input_CommercialFishery_Handle",
+                            skip = 2) %>% 
+    mutate(Start_date=as_date(Start_date), 
+           Kept_clipped_adults = ifelse(is.na(Kept_clipped_adults), 0, Kept_clipped_adults),
+           Kept_unclipped_adults = ifelse(is.na(Kept_unclipped_adults), 0, Kept_unclipped_adults),
+           Released_adults = ifelse(is.na(Released_adults), 0, Released_adults),
+           Kept_jacks = ifelse(is.na(Kept_jacks), 0, Kept_jacks),
+           Comment = as.character(Comment))
+  
+  # Read fishery areas ####
+  LUT_fishery_areas<-read_excel(path = paste(inriver_directory, inriver_filename, sep=""), 
+                                sheet = "LUT_Fishery_Areas",
+                                skip = 2)
+  
+  # Read gear types and associated information ####
+  LUT_gear<-read_excel(path = paste(inriver_directory, inriver_filename, sep=""), 
+                            sheet = "LUT_Gear",
+                            skip = 2)
+  
+  # Read timing curves and pivot to long format so it can be joined with other data ####
+  LUT_timing_curves<-read_excel(path = paste(inriver_directory, inriver_filename, sep=""), 
+                                sheet = "Input_Timing_curves",
+                                skip = 2) %>% 
+    mutate(Calendar_date=as_date(Calendar_date)) %>% 
+    pivot_longer(cols=2:ncol(.), names_to = "Fishery_area") %>% 
+    mutate(Prop_early=value) %>% 
+    select(-value)
+  
+  # Read LCN abundance data ####
+  LCN_abundance<-read_excel(path = paste(inriver_directory, inriver_filename, sep=""), 
+                                 sheet = "Input_LCN_abundance",
+                                 skip = 2)
+  
+  # Join sport and commercial handle to respective calendars
+  merge_sport<-left_join(sport_handle, fishing_calendars$Sport_Calendar, by=c("Start_date" = "Date"))
+  merge_commercial<-left_join(commercial_handle, fishing_calendars$Commercial_calendar, by=c("Start_date" = "Date"))  
+  
+  # Join all fishery data and LUT into a unified tibble/data.frame ####
+  join_all_fishery_data<-full_join(merge_commercial, merge_sport) %>% 
+    left_join(LUT_fishery_areas, by="Fishery_area") %>% 
+    rename(Comment = Comment.y) %>% 
+    left_join(LUT_gear) %>% 
+    left_join(LUT_timing_curves, by=c("Start_date" = "Calendar_date", "Fishery_area" = "Fishery_area")) %>% 
+    relocate(Start_date, DayOfWeek, Start_time_commercial, Stat_week_commercial, Stat_week_sport, Gear_category, 
+             Gear_name, Gear_configuration, Release_mortality_rate, Fishery_area, Above_Lewis_River, 
+             Prop_unmarked_local, Prop_early, Commercial_vessel_count, Commercial_hours_open, Sport_vessel_count, 
+             Sport_angler_count, Sport_bag_limit_adults)
+  
+  # Calculate all handle combinations (Kept/released/release morts by early/late by mark/unmarked by adult/jack) ####
+  fishery_data_calc_timing_rel_mort<-mutate(join_all_fishery_data,
+                         Gear_category = ifelse(Fishery_area %in% 
+                                                  c("Youngs Bay", 
+                                                    "Tongue Pt. & S. Channel", 
+                                                    "Blind & Knappa Slough", 
+                                                    "Deep River"),
+                                                "SAFE", Fishery_area),
+                         Kept_clipped_adults_early = Kept_clipped_adults * Prop_early,
+                         Kept_clipped_adults_late = Kept_clipped_adults * (1-Prop_early),
+                         Kept_unclipped_adults_early = Kept_unclipped_adults * Prop_early,
+                         Kept_unclipped_adults_late = Kept_unclipped_adults * (1-Prop_early),
+                         Released_adults_early = Released_adults * Prop_early,
+                         Released_adults_late = Released_adults * (1-Prop_early),
+                         Released_mortality_adults_early = Released_adults * Prop_early * Release_mortality_rate,
+                         Released_mortality_adults_late = Released_adults * (1-Prop_early) * Release_mortality_rate,
+                         Kept_jacks_early = Kept_jacks * Prop_early,
+                         Kept_jacks_late = Kept_jacks * (1-Prop_early)) %>% 
+    relocate(Comment, .after=Kept_jacks_late)
+  
+  return(list(fishery_data=fishery_data_calc_timing_rel_mort,  
+              Timing_curves=LUT_timing_curves, 
+              LUT_gear=LUT_gear, 
+              LUT_fishery_areas=LUT_fishery_areas, 
+              LCN_abundance=LCN_abundance))
+}

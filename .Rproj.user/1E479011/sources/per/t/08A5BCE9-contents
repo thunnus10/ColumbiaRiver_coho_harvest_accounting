@@ -1,0 +1,55 @@
+source("Functions/read_FRAM_data.R")
+source("Functions/read_inriver_data.R")
+source("Functions/generate_fishery_calendars.R")
+source("Functions/calc_ER_HR.R")
+library('gt')
+
+# Set directories for FRAM input data and inriver data ####
+# FRAM directory and filename will also be called internally by cal_ER_HR.R
+FRAM_directory <- "Data/FRAM/2022/Coho2223_STT/" 
+FRAM_filename <- "Coho2223_STT_ColR_transfer.xlsx"
+
+inriver_directory <- "Data/" 
+inriver_filename <- "Coho_inriver_harvest_accounting_input.xlsx"
+
+# Read FRAM data ####
+# This function is slow (~40 seconds) because it is parsing non-tabuluar data from large FRAM files
+FRAM_data<-read_FRAM_data(FRAM_directory = FRAM_directory,
+                          FRAM_filename = FRAM_filename)
+
+# Generate sport and commercial stat week fishery calendars ####
+calendars<-generate_fishery_calendars(fishery_year=2022, 
+                                      start_day_sport_week="Monday", 
+                                      start_day_commericial_week="Sunday")
+
+filter(calendars$Commercial_calendar, Stat_week_commercial >= 34)
+
+# Read in-river fishery handle data and join to look up tables ####
+CR_data<-read_inriver_data(inriver_directory = inriver_directory, 
+                                inriver_filename = inriver_filename,
+                                fishery_year=2022, 
+                                start_day_sport_week="Monday", 
+                                start_day_commericial_week="Sunday")
+
+# Calculate exploitation rates and harvest rates ####
+calcs<-calc_ER_HR(FRAM_directory, FRAM_filename, CR_data_object=CR_data$fishery)
+
+
+
+#gt(calcs, groupname_col = Gear_category, rowname_col = )
+group_by(calcs, "Gear Category" = Gear_category) %>% 
+  summarize("Kept clipped early" = sum(Kept_clipped_adults_early, na.rm = T),
+            "Kept clipped late" = sum(Kept_clipped_adults_late, na.rm = T),
+            # "Kept unclipped early" = sum(Kept_unclipped_adults_early, na.rm = T),
+            # "Kept unclipped late" = sum(Kept_unclipped_adults_late, na.rm = T),
+            # "Unclipped morts early" = sum(c(Kept_unclipped_adults_early, 
+            #                                       Released_mortality_adults_early), na.rm = T),
+            # "Unclipped morts late" = sum(c(Kept_unclipped_adults_late, 
+            #                                 Released_mortality_adults_late), na.rm = T),
+            "HR clipped early" = percent(sum(HR_marked_early, na.rm = T), accuracy = 0.01), 
+            "HR clipped late" = percent(sum(HR_marked_late, na.rm = T), accuracy = 0.01))
+            # "HR unclipped early" = percent(sum(HR_unmarked_early, na.rm = T), accuracy = 0.01), 
+            # "HR unclipped late" = percent(sum(HR_unmarked_late, na.rm = T), accuracy = 0.01))
+
+  
+  

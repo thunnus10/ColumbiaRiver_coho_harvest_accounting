@@ -1,0 +1,26 @@
+{
+    "id": "08A5BCE9",
+    "path": "C:/Users/sippetjs/Washington State Executive Branch Agencies/DFW-CRMU - Data and Analysis Tools/Harvest Accounting/Coho/Coho_in-river_harvest_accounting_R_Project/run_coho.R",
+    "project_path": "run_coho.R",
+    "type": "r_source",
+    "hash": "2430341095",
+    "contents": "",
+    "dirty": false,
+    "created": 1648830717597.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "23,0",
+        "scrollLine": "16"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1649626800,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1649626800232,
+    "read_only": false,
+    "read_only_alternatives": []
+}

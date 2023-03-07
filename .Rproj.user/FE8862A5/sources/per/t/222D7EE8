@@ -1,0 +1,28 @@
+{
+    "id": "222D7EE8",
+    "path": "C:/Users/sippetjs/Washington State Executive Branch Agencies/DFW-CRMU - Data and Analysis Tools/Harvest Accounting/Coho/Coho_in-river_harvest_accounting_R_Project/Functions/calc_ER_HR.R",
+    "project_path": "Functions/calc_ER_HR.R",
+    "type": "r_source",
+    "hash": "3633913554",
+    "contents": "",
+    "dirty": false,
+    "created": 1652457866541.0,
+    "source_on_save": false,
+    "relative_order": 4,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "196,0",
+        "scrollLine": "0",
+        "docOutlineVisible": "0",
+        "rmdVisualCollapsedChunks": ""
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1659309134,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1659309134125,
+    "read_only": false,
+    "read_only_alternatives": []
+}

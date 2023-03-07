@@ -1,0 +1,94 @@
+# This function reads data from a FRAM run ####
+# Function written by Tim Sippel - WDFW 
+
+read_FRAM_data<-function(FRAM_directory, FRAM_filename){
+  if (!"tidyverse" %in% installed.packages()) install.packages("tidyverse")
+  if (!"readxl" %in% installed.packages()) install.packages("readxl")
+  if (!"tidyxl" %in% installed.packages()) install.packages("tidyxl")
+  library("tidyverse")
+  library("readxl")
+  library("tidyxl")
+  library("magrittr")
+  
+  # Read FRAM run name from tab FishSumAllPRN ####
+  # This runs slow because it has to parse non-tabular data from FRAM file
+  FRAM_run_name<-paste("FRAM Run: ", 
+                       filter(xlsx_cells(path = paste(FRAM_directory, FRAM_filename, sep=""), 
+                              sheets = "FishSumAllPRN"), address == "A5")$character, 
+                       sep="")
+  
+  # Read FRAM ColRHarvestInput tab and select HATCHERY abundance and harvest table (cells C9:I13) ####
+  FRAM_hatchery_abun_harvest<-read_excel(path = paste(FRAM_directory, FRAM_filename, sep=""), 
+                 sheet = "ColRHarvestInput",
+                 range = "C9:I13") %>% 
+    select(c(Category, Marked...2, Unmarked...3, Marked...5, Unmarked...6)) %>% 
+    rename(Early_Marked = Marked...2, 
+           Early_UnMarked = Unmarked...3 , 
+           Late_Marked = Marked...5, 
+           Late_UnMarked = Unmarked...6) %>% 
+    pivot_longer(cols = starts_with(c("Early", "Late")),
+                 values_to = "Value") %>% 
+    separate(name, 
+             into = c("Run_type", "Mark_status"),
+             sep="_") %>%
+    separate(Category, 
+             into = c("Source", "Abundance_Harvest"),
+             sep=" ") %>%
+    mutate(Production_type = "Hatchery", 
+           Source=ifelse(Source ==  "Buoy", "Buoy10", Source),
+           Abundance_Harvest=ifelse(Abundance_Harvest=="abundance", "Abundance", Abundance_Harvest),
+           Abundance_Harvest=ifelse(Abundance_Harvest=="harvest", "Harvest", Abundance_Harvest),
+           Abundance_Harvest=ifelse(Abundance_Harvest=="run", "Abundance", Abundance_Harvest),
+           Abundance_Harvest=ifelse(Abundance_Harvest=="10", "Harvest", Abundance_Harvest)) %>% 
+    relocate(Source, Abundance_Harvest, Run_type, Production_type, Mark_status, Value)
+  
+  
+  
+  # Read FRAM ColRHarvestInput tab and select WILD abundance and harvest table (cells C9:I13) ####
+  FRAM_wild_abun_harvest<-read_excel(path = paste(FRAM_directory, FRAM_filename, sep=""), 
+                                         sheet = "ColRHarvestInput",
+                                         range = "C16:E19") %>% 
+    pivot_longer(cols = c("Early Wilds", "Late Wilds"),
+                 values_to = "Value") %>% 
+    separate(name, 
+             into = c("Run_type", "Production_type"),
+             sep=" ") %>%
+    separate(Category, 
+             into = c("Source", "Abundance_Harvest"),
+             sep=" ") %>% 
+    mutate(Production_type = "Wild", 
+           Mark_status = "UnMarked",
+           Source=ifelse(Source ==  "Buoy", "Buoy10", Source),
+           Abundance_Harvest=ifelse(Abundance_Harvest=="abundance", "Abundance", Abundance_Harvest),
+           Abundance_Harvest=ifelse(Abundance_Harvest=="harvest", "Harvest", Abundance_Harvest),
+           Abundance_Harvest=ifelse(Abundance_Harvest=="10", "Harvest", Abundance_Harvest)) %>% 
+    relocate(Source, Abundance_Harvest, Run_type, Production_type, Mark_status, Value)
+
+  
+  # Join FRAM hatchery wild tables ####
+  FRAM_hatchery_wild_abun_harvest<-full_join(FRAM_hatchery_abun_harvest, 
+                                             FRAM_wild_abun_harvest)  
+  
+  
+  # Read FRAM unmarked escapement from tab AttachC ####
+  # This runs slow because it has to parse non-tabular data from FRAM file
+  FRAM_Upriver_Esc_Unmarked<-round(filter(xlsx_cells(path = paste(FRAM_directory, FRAM_filename, sep=""), 
+                                                     sheets = "AttachC"), 
+                                 address %in% c("L29", "L49", "M29", "M49"))$numeric)
+  FRAM_Upriver_Esc_Unmarked<-tibble(
+    Early_UnMarked=c(FRAM_Upriver_Esc_Unmarked[[1]], 
+                     FRAM_Upriver_Esc_Unmarked[[3]], 
+                     FRAM_Upriver_Esc_Unmarked[[1]] - FRAM_Upriver_Esc_Unmarked[[3]]),
+    Late_UnMarked=c(FRAM_Upriver_Esc_Unmarked[[2]], 
+                    FRAM_Upriver_Esc_Unmarked[[4]],
+                    FRAM_Upriver_Esc_Unmarked[[2]] - FRAM_Upriver_Esc_Unmarked[[4]])) %>% 
+    rowid_to_column("Source") #%>% 
+  FRAM_Upriver_Esc_Unmarked$Source <- c("Esc_To_B10", "LCR_harvest", "Esc_To_Bonn")
+  
+
+    return(list(FRAM_run_name=FRAM_run_name, 
+                FRAM_hatchery_wild_abun_harvest=FRAM_hatchery_wild_abun_harvest,
+                FRAM_Upriver_Esc_Unmarked=FRAM_Upriver_Esc_Unmarked))
+}
+    
+    
